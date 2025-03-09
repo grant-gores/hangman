@@ -1,13 +1,43 @@
 def load_dictionary
-  file_path = File.expand_path("../word_list.txt", __dir__)  # Correct path from lib/
-  words = File.readlines(file_path, chomp: true)  # Read all words into an array
-
-  # Filter words that are between 5 and 12 characters
+  file_path = File.expand_path("../word_list.txt", __dir__)
+  words = File.readlines(file_path, chomp: true)
   filtered_words = words.select { |word| word.length.between?(5, 12) }
+  return filtered_words.sample
+end
 
-  # Select a random word
-  secret_word = filtered_words.sample
-  return secret_word
+def save_game(secret_word, word_display, guessed_letters, wrong_guesses, wrong_letters)
+  File.open("save_game.dat", "wb") do |file|
+    Marshal.dump({ 
+      secret_word: secret_word, 
+      word_display: word_display, 
+      guessed_letters: guessed_letters, 
+      wrong_guesses: wrong_guesses, 
+      wrong_letters: wrong_letters
+    }, file)
+  end
+  puts "Game saved!"
+end
+
+def load_game
+  if File.exist?("save_game.dat")
+    File.open("save_game.dat", "rb") do |file|
+      return Marshal.load(file)
+    end
+  else
+    puts "No saved game found!"
+    return nil
+  end
+end
+
+def check_guess(secret_word, word_display, guess)
+  correct = false
+  secret_word.chars.each_with_index do |char, index|
+    if char == guess
+      word_display[index] = char
+      correct = true
+    end
+  end
+  return correct
 end
 
 def play_game
@@ -16,19 +46,38 @@ def play_game
   puts "After eight wrong letter guesses the game will end."
   puts "One wrong full word guess and the game is over!"
   puts "--------------------------------------------------"
+  puts "Would you like to open one of your saved games? (Y/N)"
+  
+  saved_game = gets.downcase.chomp
+  if saved_game == "y"
+    saved_data = load_game
+    if saved_data
+      secret_word = saved_data[:secret_word]
+      word_display = saved_data[:word_display]
+      guessed_letters = saved_data[:guessed_letters]
+      wrong_guesses = saved_data[:wrong_guesses]
+      wrong_letters = saved_data[:wrong_letters]
+    else
+      secret_word = load_dictionary
+      word_display = Array.new(secret_word.length, "_")
+      guessed_letters = []
+      wrong_guesses = 0
+      wrong_letters = []
+    end
+  else
+    secret_word = load_dictionary
+    word_display = Array.new(secret_word.length, "_")
+    guessed_letters = []
+    wrong_guesses = 0
+    wrong_letters = []
+  end
 
-  secret_word = load_dictionary  # Get the word
-  word_display = Array.new(secret_word.length, "_")  # Create a hidden word
-  wrong_guesses = 0
   max_wrong_guesses = 8
-  guessed_letters = []
-  wrong_letters = []
-
   puts "Your word to guess: #{word_display.join(' ')}"
 
   loop do
     puts "Guess a letter or the entire word!"
-    puts "Wrong guesses: #{wrong_letters}"
+    puts "Wrong guesses: #{wrong_letters.join(', ')}"
     guess = gets.downcase.chomp
 
     if guess.length == 1
@@ -70,18 +119,14 @@ def play_game
       puts "Game over! The word was: #{secret_word}"
       break
     end
-  end
-end
 
-def check_guess(secret_word, word_display, guess)
-  correct = false
-  secret_word.chars.each_with_index do |char, index|
-    if char == guess
-      word_display[index] = char
-      correct = true
+    # Ask to save the game
+    puts "Would you like to save the game? (Y/N)"
+    save = gets.downcase.chomp
+    if save == 'y'
+      save_game(secret_word, word_display, guessed_letters, wrong_guesses, wrong_letters)
     end
   end
-  return correct
 end
 
 play_game
